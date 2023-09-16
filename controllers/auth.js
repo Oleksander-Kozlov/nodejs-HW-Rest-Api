@@ -20,39 +20,90 @@ const avatarDir = path.join(__dirname, "../", "public", "avatars");
 
 // запит реєстрації
 const register = async (req, res) => {
-    // з реквеста отримую емейл та пароль
-    const { email, password } = req.body;
-// відправляю запит на mongoDB та перевіряю чи є така пошта
-    const user = await User.findOne({email});
-    if (user) {
-        throw HttpError(409, "Email already in use");
+
+  // з реквеста отримую емейл та пароль
+  const { email, password } = req.body;
+  // відправляю запит на mongoDB та перевіряю чи є така пошта
+  const user = await User.findOne({ email });
+  if (user) {
+    throw HttpError(409, "Email already in use");
+  }
+  // якщо немає хешую пароль
+  const hashPassword = await bcrypt.hash(password, 10);
+
+  // тимчасовий avatar
+  const avatarUrl = gravatar.url(email);
+  // додаємо код верифікації
+  const verificationToken = nanoid();
+  // стоврюю нового Юзера з мейлом та хешованим паролем
+  const newUser = await User.create({
+    ...req.body,
+    password: hashPassword,
+    avatarUrl,
+    verificationToken,
+  });
+  // створюємо емейл на підтвердження
+  const verifyEmail = {
+    to: email,
+    subject: "verify email", 
+    html: `<a target="_blank" href="${BASE_URL}/api/auth/verify/${verificationToken}">Click for verify email</a>`,
+  };
+// відправляю емейл на підтвердження
+  await sendEmail(verifyEmail);
+
+  // відправляю відповідь, що користувач створений
+  res.status(201).json({
+    email: newUser.email,
+  });
+};
+
+const verifyEmail = async (req, res) => {
+    const { verificationToken } = req.params;
+    console.log("verificationToken", verificationToken);
+  // відправляю запит на mongoDB та шукаю юзера з таким токеном
+    const user = await User.findOne({ verificationToken });
+    console.log("user", user);
+  // перевіряю чи є такий токен
+  if (!user) {
+    throw HttpError(404, "User not found");
     }
-    // якщо немає хешую пароль
-    const hashPassword = await bcrypt.hash(password, 10);
+    // оновлюємо юзера та підтверджуємо верифікацію
+    await User.findByIdAndUpdate(user._id, { verify: true, verificationToken: "" });
+    // відправляємо повідомлення що верифікація пройдена 
+     res.status(200).json({
+       message: "Verification successful",
+     });
+}
 
-    // тимчасовий avatar
-    const avatarUrl = gravatar.url(email)
-    // стоврюю нового Юзера з мейлом та хешованим паролем
-    const newUser = await User.create({...req.body, password: hashPassword, avatarUrl})
+const resendVerifyEmail = async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    throw HttpError(400, "missing required field email")
+  }
+  const user = await User.findOne({ email });
+  if (!user) {
+    throw HttpError(401, "Email not found");
+  }
+  if (user.verify) {
+    throw HttpError(401, "Verification has already been passed");
+  }
+  // знов створюємо емейл на підтвердження
+  const verifyEmail = {
+    to: email,
+    subject: "verify email",
+    html: `<a target="_blank" href="${BASE_URL}/api/auth/verify/${user.verificationToken}">Click for verify email</a>`,
+    };
 
-    // відправляю відповідь, що користувач створений
-    res.status(201).json({
-        email: newUser.email
-    })
     
 }
 
-const login = async(req, res) => {
-    const { email, password } = req.body;
-    const user = await User.findOne({ email });
-    if (!user) {
-        throw HttpError(401, "Email or password invalid");  
-    }
-    // переверію правильність захешованого пароля з введеним паролем
-    const passwordCompare = await bcrypt.compare(password, user.password);
-    if (!passwordCompare) {
-        throw HttpError(401, "Email or password invalid");          
-    }
+
+  // відправляю відповідь, що користувач створений
+   res.status(200).body({ email: email }).json({
+     message: "Verification email sent",
+   });
+};
+
 
     const payload = {id: user._id}
     // створюю токен    
