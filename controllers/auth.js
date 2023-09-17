@@ -1,7 +1,9 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 
+
 const gravatar = require("gravatar");
+
 const path = require("path");
 const fs = require("fs/promises");
 const Jimp = require("jimp");
@@ -29,7 +31,8 @@ const register = async (req, res) => {
   }
   // якщо немає хешую пароль
   const hashPassword = await bcrypt.hash(password, 10);
-
+  // з реквеста отримую емейл та пароль
+  
   // тимчасовий avatar
   const avatarUrl = gravatar.url(email);
   // додаємо код верифікації
@@ -117,29 +120,32 @@ const login = async (req, res) => {
   if (!passwordCompare) {
     throw HttpError(401, "Email or password invalid");
   }
-
+  // повертаю токен
   const payload = { id: user._id };
   // створюю токен
   const token = jwt.sign(payload, SECRET_KEY, { expiresIn: "23h" });
   // записую токен до об"єкту
   await User.findByIdAndUpdate(user._id, { token });
-  // повертаю токен
+  
 
   res.json({
     token: token,
   });
 };
 
+
 const getCurrent = async (req, res) => {
   const { email, subscription } = req.user;
   res.json({ email, subscription });
 };
+
 
 const logout = async (req, res) => {
   const { _id } = req.user;
   await User.findByIdAndUpdate(_id, { token: "" });
   res.json({ message: "Logout success" });
 };
+ 
 
 const updateAvatar = async (req, res) => {
   const { _id } = req.user;
@@ -150,7 +156,6 @@ const updateAvatar = async (req, res) => {
   await image.resize(250, newHeight).write(tempUpload);
   // записуємо унікальне ім"я для авки
   const fileName = `${_id}_${originalname}`;
-
   // cтворюємо папку для зберігання аватарок
   const resultUpload = path.join(avatarDir, fileName);
   // переміщуємо
@@ -162,14 +167,14 @@ const updateAvatar = async (req, res) => {
 
   res.json(avatarUrl);
 };
+  
 
 module.exports = {
-    register: ctrlWrapper(register),
-    verifyEmail: ctrlWrapper(verifyEmail),
-    resendVerifyEmail: ctrlWrapper(resendVerifyEmail),
+  register: ctrlWrapper(register),
   login: ctrlWrapper(login),
   getCurrent: ctrlWrapper(getCurrent),
   logout: ctrlWrapper(logout),
-
+  verifyEmail: ctrlWrapper(verifyEmail),
+  resendVerifyEmail: ctrlWrapper(resendVerifyEmail),
   updateAvatar: ctrlWrapper(updateAvatar),
 };

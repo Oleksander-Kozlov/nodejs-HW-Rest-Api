@@ -42,9 +42,11 @@ const usersSchema = new Schema(
       // required: [true, "Verify token is required"],
       default:"",
     },
+
   },
   { versionKey: false, timestamps: true }
 );
+
 // якщо валідація не пройдена викидаємо помилку
 usersSchema.post("save", handleMogooseError);
 
@@ -64,6 +66,7 @@ const logInSchema = Joi.object({
   email: Joi.string().pattern(emailRegexp).required(),
   password: Joi.string().min(6).required(),
 });
+
 // схема валідації оновлення підписки
 const updateSubscription = Joi.object({
   subscription: Joi.string().valid(...subscriptionList).required(),
@@ -73,7 +76,9 @@ const schemas = {
   logInSchema,
   updateSubscription,
   verifySchema,
+  
 };
+
 // створюємо модель
 const User = model("User", usersSchema);
 
